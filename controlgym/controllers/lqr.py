@@ -4,8 +4,13 @@ import logging
 from scipy.linalg import solve_discrete_are, solve, LinAlgError
 
 
-def _lqr_gain(A: np.ndarray[float], B: np.ndarray[float], Q: np.ndarray[float], 
-              R: np.ndarray[float], S: np.ndarray[float]):
+def _lqr_gain(
+    A: np.ndarray[float],
+    B: np.ndarray[float],
+    Q: np.ndarray[float],
+    R: np.ndarray[float],
+    S: np.ndarray[float],
+):
     """Private function to compute the gain matrices of the LQR controller
         using algebraic Riccati equation (ARE).
 
@@ -26,7 +31,12 @@ def _lqr_gain(A: np.ndarray[float], B: np.ndarray[float], Q: np.ndarray[float],
     else:
         gain_lqr = -solve(R + B.T @ P @ B, B.T @ P @ A + S.T)
         # compute the LQ tracking gain for PDE envs, where S = 0.
-        gain_lqt = inv(R + B.T @ P @ B) @ B.T @ inv(np.identity(A.shape[0]) - (A + B @ gain_lqr).T) @ Q
+        gain_lqt = (
+            inv(R + B.T @ P @ B)
+            @ B.T
+            @ inv(np.identity(A.shape[0]) - (A + B @ gain_lqr).T)
+            @ Q
+        )
     return gain_lqr, gain_lqt
 
 
@@ -40,7 +50,7 @@ class LQR:
         output_t = C1 * state_t + D12 * action_t + D11 * noise_t
         noise_t = N(0, noise_cov * I)
     The LQR controller is computed as:
-        action_t = gain_lqr * state_t + gain_lqt * target_state 
+        action_t = gain_lqr * state_t + gain_lqt * target_state
     where gain_lqr is the control gain matrix.
 
     ### Arguments
@@ -76,7 +86,11 @@ class LQR:
         A, B2 = self.env.A, self.env.B2
         Q = self.env.Q if hasattr(self.env, "Q") else np.identity(self.env.n_state)
         R = self.env.R if hasattr(self.env, "R") else np.identity(self.env.n_action)
-        S = self.env.S if hasattr(self.env, "S") else np.zeros((self.env.n_state, self.env.n_action))
+        S = (
+            self.env.S
+            if hasattr(self.env, "S")
+            else np.zeros((self.env.n_state, self.env.n_action))
+        )
 
         # compute the LQR gain
         self.gain_lqr, self.gain_lqt = _lqr_gain(A, B2, Q, R, S)

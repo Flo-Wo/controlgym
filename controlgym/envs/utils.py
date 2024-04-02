@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.signal import cont2discrete
 
+
 def ft_matrix(n_state):
     """
     Computes the DFT matrix of size N with 'backward' normalization mode in numpy.fft.fft
@@ -33,25 +34,26 @@ def ift_matrix(n_state):
     IDFT = np.conjugate(DFT.T) / n_state
     return IDFT
 
+
 def c2d(A_cont, B1_cont, B2_cont, C1_cont, D11_cont, D12_cont, sample_time):
     """Discretize the continuous-time system.
 
-        Args:
-            A_cont: The A matrix of the continuous-time system.
-            B1_cont: The B1 matrix of the continuous-time system.
-            B2_cont: The B2 matrix of the continuous-time system.
-            C1_cont: The C1 matrix of the continuous-time system.
-            D11_cont: The D11 matrix of the continuous-time system.
-            D12_cont: The D12 matrix of the continuous-time system.
-            sample_time: The sample time of the discrete-time system.
+    Args:
+        A_cont: The A matrix of the continuous-time system.
+        B1_cont: The B1 matrix of the continuous-time system.
+        B2_cont: The B2 matrix of the continuous-time system.
+        C1_cont: The C1 matrix of the continuous-time system.
+        D11_cont: The D11 matrix of the continuous-time system.
+        D12_cont: The D12 matrix of the continuous-time system.
+        sample_time: The sample time of the discrete-time system.
 
-        Returns:
-            A_disc: The A matrix of the discrete-time system.
-            B1_disc: The B1 matrix of the discrete-time system.
-            B2_disc: The B2 matrix of the discrete-time system.
-            C1_disc: The C1 matrix of the discrete-time system.
-            D11_disc: The D11 matrix of the discrete-time system.
-            D12_disc: The D12 matrix of the discrete-time system.
+    Returns:
+        A_disc: The A matrix of the discrete-time system.
+        B1_disc: The B1 matrix of the discrete-time system.
+        B2_disc: The B2 matrix of the discrete-time system.
+        C1_disc: The C1 matrix of the discrete-time system.
+        D11_disc: The D11 matrix of the discrete-time system.
+        D12_disc: The D12 matrix of the discrete-time system.
     """
     # Stack B1 and B2 horizontally
     B_cont_stacked = np.hstack((B1_cont, B2_cont))
@@ -69,4 +71,3 @@ def c2d(A_cont, B1_cont, B2_cont, C1_cont, D11_cont, D12_cont, sample_time):
     D12_disc = D1_disc_stacked[:, D11_cont.shape[1] :]
 
     return A_disc, B1_disc, B2_disc, C1_disc, D11_disc, D12_disc
-

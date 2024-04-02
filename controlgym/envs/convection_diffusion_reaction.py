@@ -150,7 +150,7 @@ class ConvectionDiffusionReactionEnv(PDE):
 
         # compute the observation
         observation = self._get_obs()
-        
+
         # compute the next state
         next_state = self.A @ self.state + self.B2 @ action + disturbance
 
@@ -188,13 +188,13 @@ class ConvectionDiffusionReactionEnv(PDE):
             np.fft.fftfreq(self.n_state, self.domain_length / self.n_state) * 2 * np.pi
         )  # wavenumbers
         eigen = np.exp(
-                    (
-                        -self.convective_velocity * 1j * domain_wavenumber_complex
-                        - self.diffusivity_constant * domain_wavenumber_complex**2
-                        + self.reaction_constant
-                    )
-                    * self.sample_time
-                )
+            (
+                -self.convective_velocity * 1j * domain_wavenumber_complex
+                - self.diffusivity_constant * domain_wavenumber_complex**2
+                + self.reaction_constant
+            )
+            * self.sample_time
+        )
         A = np.real(IDFT @ np.diag(eigen) @ DFT)
         return A, eigen
 

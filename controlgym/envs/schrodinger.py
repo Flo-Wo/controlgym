@@ -168,7 +168,7 @@ class SchrodingerEnv(PDE):
 
         # compute the observation
         observation = self._get_obs()
-        
+
         # compute the next state
         next_state = self.A @ self.state + self.B2 @ action + disturbance
 
@@ -180,7 +180,7 @@ class SchrodingerEnv(PDE):
 
         # update the environment
         self.state = next_state
-        
+
         # terminated if the cost is too large
         self.step_count += 1
         terminated = False if self.step_count < self.n_steps else True

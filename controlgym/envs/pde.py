@@ -88,7 +88,9 @@ class PDE(gymnasium.Env):
         # check whether the n_state is even
         assert self.n_state % 2 == 0, "n_state must be even."
 
-        self.target_state = np.zeros(self.n_state) if target_state is None else target_state
+        self.target_state = (
+            np.zeros(self.n_state) if target_state is None else target_state
+        )
 
         self.n_observation = n_observation
         self.n_action = n_action
@@ -231,7 +233,7 @@ class PDE(gymnasium.Env):
 
         # set the new system state
         next_state = np.fft.irfft(state_fourier) + disturbance
-       
+
         # compute the reward, which happens before updating the environment state
         # because the reward (might) depends on both the current state and the next state.
         # * In the default reward function, the dependence on the current state is
@@ -321,13 +323,18 @@ class PDE(gymnasium.Env):
         observation = self.C @ self.state + noise
         return observation
 
-    def get_reward(self, action: np.ndarray[float], observation: np.ndarray[float], disturbance: np.ndarray[float], 
-                   next_state: np.ndarray[float]):
-        """ function to generate the reward for the current time step
+    def get_reward(
+        self,
+        action: np.ndarray[float],
+        observation: np.ndarray[float],
+        disturbance: np.ndarray[float],
+        next_state: np.ndarray[float],
+    ):
+        """function to generate the reward for the current time step
 
         Args:
             action (`ndarray` with shape `(n_action,)): action provided by the agent to update the environment state.
-            observation (`ndarray` with shape `(n_observation,)): observation = C * state + D21 * disturbance 
+            observation (`ndarray` with shape `(n_observation,)): observation = C * state + D21 * disturbance
             (not used in the default reward function)
             disturbance (`ndarray` with shape `(n_disturbance,)): either stochastic or deterministic disturbance input.
             (not used in the default reward function)
@@ -340,17 +347,21 @@ class PDE(gymnasium.Env):
         Example of constructing an environment with a custom reward function:
         ```
         def custom_get_reward(self, action, observation, disturbance, next_state):
-            return - np.linalg.norm(self.state)**2 - np.linalg.norm(action)**2 
-        
+            return - np.linalg.norm(self.state)**2 - np.linalg.norm(action)**2
+
         if __name__ == "__main__":
             env = gym.make('env_id', **kwargs)
             env.get_reward = custom_get_reward.__get__(env)
         ```
         """
-        reward = - float((self.state - self.target_state).T @ self.Q @ (self.state - self.target_state) 
-                         + action.T @ self.R @ action)
+        reward = -float(
+            (self.state - self.target_state).T
+            @ self.Q
+            @ (self.state - self.target_state)
+            + action.T @ self.R @ action
+        )
         return reward
-    
+
     def _compute_fourier_linear_op(self):
         """
         template function to be implemented in child classes for nonlinear PDEs

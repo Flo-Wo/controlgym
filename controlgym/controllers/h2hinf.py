@@ -6,51 +6,65 @@ import warnings
 warnings.filterwarnings("error")
 
 
-def _h2hinf_gain(A: np.ndarray[float], B1: np.ndarray[float], B2: np.ndarray[float], 
-                 C1: np.ndarray[float], D11: np.ndarray[float], D12: np.ndarray[float], gamma: float):
-        """Private function to compute the gain matrices of the H2/Hinfinity controller
-            using block algebraic Riccati equation (GARE).
+def _h2hinf_gain(
+    A: np.ndarray[float],
+    B1: np.ndarray[float],
+    B2: np.ndarray[float],
+    C1: np.ndarray[float],
+    D11: np.ndarray[float],
+    D12: np.ndarray[float],
+    gamma: float,
+):
+    """Private function to compute the gain matrices of the H2/Hinfinity controller
+        using block algebraic Riccati equation (GARE).
 
-        Args:
-            A, B1, B2, C1, D11, D12: ndarray[float], system matrices.
-            gamma: float, parameter that defines the robustness level of the H2/Hinfinity controller.
-                when gamma -> infinity, the resulting controller is equivalent to the H2 controller.
+    Args:
+        A, B1, B2, C1, D11, D12: ndarray[float], system matrices.
+        gamma: float, parameter that defines the robustness level of the H2/Hinfinity controller.
+            when gamma -> infinity, the resulting controller is equivalent to the H2 controller.
 
-        Returns:
-            gain_act, gain_dis: ndarray[float], control and adversary gain matrices, respectively.
-            If the GARE fails to find a solution, gain_act and gain_dis are set to None.
-        """
-        B_stacked = np.hstack((B2, B1))
-        D1_stacked = np.hstack((D12, D11))
-        X = np.hstack((D12.T @ D12, D12.T @ D11))
-        Y = np.hstack((D11.T @ D12, D11.T @ D11 - (gamma**2) * np.identity((D11.T @ D11).shape[0])))
-        R_stacked = np.vstack((X, Y))
-        S = C1.T @ D1_stacked
-        try:
-            P = solve_discrete_are(A, B_stacked, C1.T @ C1, R_stacked, np.identity(A.shape[0]), S)
-            gain_compact = solve(R_stacked + B_stacked.T @ P @ B_stacked, B_stacked.T @ P @ A + S.T)
-        except Exception as e:
-            if isinstance(e, ValueError):
-                logging.warning(
-                    str(e) + ". Input is ill-conditioned or gamma is too small!"
-                )
-            elif isinstance(e, LinAlgError) or isinstance(e, LinAlgWarning):
-                # Handle the LinAlgWarning
-                logging.warning(
-                    "LinAlgError/Warning: solve_discrete_are failed to find a solution: input is ill-conditioned or gamma is too small!" +
-                    "Another possible reason is gamma is too large such that numerical issues arise."
-                )
-            else:
-                # Handle other exceptions
-                logging.warning(
-                    "An unexpected error occured when calling solve_discrete_are!"
-                )
-            gain_act, gain_dis = None, None
+    Returns:
+        gain_act, gain_dis: ndarray[float], control and adversary gain matrices, respectively.
+        If the GARE fails to find a solution, gain_act and gain_dis are set to None.
+    """
+    B_stacked = np.hstack((B2, B1))
+    D1_stacked = np.hstack((D12, D11))
+    X = np.hstack((D12.T @ D12, D12.T @ D11))
+    Y = np.hstack(
+        (D11.T @ D12, D11.T @ D11 - (gamma**2) * np.identity((D11.T @ D11).shape[0]))
+    )
+    R_stacked = np.vstack((X, Y))
+    S = C1.T @ D1_stacked
+    try:
+        P = solve_discrete_are(
+            A, B_stacked, C1.T @ C1, R_stacked, np.identity(A.shape[0]), S
+        )
+        gain_compact = solve(
+            R_stacked + B_stacked.T @ P @ B_stacked, B_stacked.T @ P @ A + S.T
+        )
+    except Exception as e:
+        if isinstance(e, ValueError):
+            logging.warning(
+                str(e) + ". Input is ill-conditioned or gamma is too small!"
+            )
+        elif isinstance(e, LinAlgError) or isinstance(e, LinAlgWarning):
+            # Handle the LinAlgWarning
+            logging.warning(
+                "LinAlgError/Warning: solve_discrete_are failed to find a solution: input is ill-conditioned or gamma is too small!"
+                + "Another possible reason is gamma is too large such that numerical issues arise."
+            )
         else:
-            gain_act = -gain_compact[: B2.shape[1], :]
-            gain_dis = gain_compact[B2.shape[1] :, :]
+            # Handle other exceptions
+            logging.warning(
+                "An unexpected error occured when calling solve_discrete_are!"
+            )
+        gain_act, gain_dis = None, None
+    else:
+        gain_act = -gain_compact[: B2.shape[1], :]
+        gain_dis = gain_compact[B2.shape[1] :, :]
 
-        return gain_act, gain_dis
+    return gain_act, gain_dis
+
 
 class H2Hinf:
     """
@@ -81,17 +95,25 @@ class H2Hinf:
     [gamma]: float, parameter that defines the robustness level of the H2/Hinfinity controller.
             when gamma -> infinity, the resulting controller is equivalent to the H2 controller.
     """
+
     def __init__(self, env, gamma: float):
         self.env = env
 
         # check whether the problem is linear
         is_linear = self.env.category == "linear"
-        
+
         assert is_linear and all(
             hasattr(self.env, attr) for attr in ["A", "B1", "B2", "C1", "D11", "D12"]
         ), "The environment is not linear or system matrices do not exist. H2Hinf is not applicable"
 
-        A, B1, B2, C1, D11, D12 = (self.env.A, self.env.B1, self.env.B2, self.env.C1, self.env.D11, self.env.D12)
+        A, B1, B2, C1, D11, D12 = (
+            self.env.A,
+            self.env.B1,
+            self.env.B2,
+            self.env.C1,
+            self.env.D11,
+            self.env.D12,
+        )
 
         # compute the control and adversary gain matrices
         self.gain_act, self.gain_dis = _h2hinf_gain(A, B1, B2, C1, D11, D12, gamma)
@@ -128,7 +150,7 @@ class H2Hinf:
             seed: (optional int), random seed for the environment.
 
         Returns:
-            total_reward: float, the accumulated reward of the trajectory, 
+            total_reward: float, the accumulated reward of the trajectory,
                 which is equal to the negative H2/Hinfinity cost.
         """
         # run evaluations with current policy

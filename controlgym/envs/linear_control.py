@@ -4,6 +4,7 @@ import os
 import gymnasium
 from controlgym.envs.utils import c2d
 
+
 class LinearControlEnv(gymnasium.Env):
     """
     ### Description
@@ -45,12 +46,13 @@ class LinearControlEnv(gymnasium.Env):
     [sample_time]: each discrete-time step represents (ts) seconds. Default is 0.1.
     [noise_cov]: process noise covariance coefficient. Default is 0.1.
     [random_init_state_cov]: random initial state covariance coefficient. Default is 0.1.
-    [init_state]: initial state. Default is 
+    [init_state]: initial state. Default is
         saved values in .mat file or np.zeros(self.n_state) + self.noise_cov * np.identity(self.n_state).
     [action_limit]: limit of action. Default is None.
     [observation_limit]: limit of observation. Default is None.
     [reward_limit]: limit of reward. Default is None.
     """
+
     def __init__(
         self,
         id: str,
@@ -84,8 +86,15 @@ class LinearControlEnv(gymnasium.Env):
         env = sio.loadmat("controlgym/envs/linear_control_src/" + self.id + ".mat")
 
         # compute the discrete-time linear system parameters
-        self.A, self.B1, self.B2, self.C1, self.D11, self.D12 = c2d(env["A"],
-            env["B1"], env["B2"], env["C1"], env["D11"], env["D12"], self.sample_time)
+        self.A, self.B1, self.B2, self.C1, self.D11, self.D12 = c2d(
+            env["A"],
+            env["B1"],
+            env["B2"],
+            env["C1"],
+            env["D11"],
+            env["D12"],
+            self.sample_time,
+        )
         self.C = env["C"]
         self.D21 = env["D21"]
 
@@ -123,11 +132,16 @@ class LinearControlEnv(gymnasium.Env):
             self.random_init_state_cov * np.identity(self.n_state),
         )
         self.action_limit = np.inf if action_limit is None else action_limit
-        self.observation_limit = np.inf if observation_limit is None else observation_limit
+        self.observation_limit = (
+            np.inf if observation_limit is None else observation_limit
+        )
         self.reward_limit = np.inf if reward_limit is None else reward_limit
 
         self.action_space = gymnasium.spaces.Box(
-            low=-self.action_limit, high=self.action_limit, shape=(self.n_action,), dtype=float
+            low=-self.action_limit,
+            high=self.action_limit,
+            shape=(self.n_action,),
+            dtype=float,
         )
         self.observation_space = gymnasium.spaces.Box(
             low=-self.observation_limit,
@@ -153,7 +167,7 @@ class LinearControlEnv(gymnasium.Env):
                 ** Dynamics is evolved based on: state_{t+1} = self.A * state_t + self.B1 * disturbance + self.B2 * action_t
 
         Returns:
-            observation (`ndarray` with shape `(n_observation,)): 
+            observation (`ndarray` with shape `(n_observation,)):
                 ** Observation is obtained based on: observation = self.C * state_t + self.D21 * disturbance
             reward (float): The reward as the negative quadratic H2 cost of the current stage:
                 ** reward = - ||self.C1 @ self.state + self.D11 @ disturbance + self.D12 @ action||_2^2
@@ -162,7 +176,7 @@ class LinearControlEnv(gymnasium.Env):
                                 If true, the user needs to call reset().
             truncated (bool): Whether the reward goes out of bound. If true, the user needs to call reset().
             info (dict): Contains auxillary information. In this case, it contains the state of the system to be utlized
-                        for deploying state-feedback controllers. 
+                        for deploying state-feedback controllers.
         """
         # check whether the input control is of the right dimension
         assert action.shape == (
@@ -186,7 +200,7 @@ class LinearControlEnv(gymnasium.Env):
         # generate the observation
         observation = self._get_obs(disturbance)
         output = self._get_output(action, disturbance)
-        
+
         # step the system dynamics forward for one discrete step
         next_state = self.A @ self.state + self.B1 @ disturbance + self.B2 @ action
 
@@ -195,7 +209,7 @@ class LinearControlEnv(gymnasium.Env):
         # * In the default reward function, the dependence on the current state is
         # through the self.state attribute, which will not be updated until the next line.
         reward = self.get_reward(action, observation, disturbance, next_state)
-        
+
         # update the environment
         self.state = next_state
 
@@ -225,10 +239,10 @@ class LinearControlEnv(gymnasium.Env):
             state (optional `ndarray` with shape `(n_state,)): An specific initial state to reset the environment to.
 
         Returns:
-            observation (`ndarray` with shape `(n_observation,)): 
+            observation (`ndarray` with shape `(n_observation,)):
                 ** Observation is obtained based on: observation = self.C * state_t + self.D21 * disturbance
             info (dict): Contains auxillary information. In this case, it contains the state of the system to be utlized
-                        for deploying state-feedback controllers. 
+                        for deploying state-feedback controllers.
         """
         super().reset(seed=seed)
         # reset the system to a user-defined initial state if there is one
@@ -288,13 +302,18 @@ class LinearControlEnv(gymnasium.Env):
         observation = self.C @ self.state + self.D21 @ disturbance
         return observation
 
-    def get_reward(self, action: np.ndarray[float], observation: np.ndarray[float], disturbance: np.ndarray[float], 
-                   next_state: np.ndarray[float]):
-        """ function to generate the reward for the current time step
+    def get_reward(
+        self,
+        action: np.ndarray[float],
+        observation: np.ndarray[float],
+        disturbance: np.ndarray[float],
+        next_state: np.ndarray[float],
+    ):
+        """function to generate the reward for the current time step
 
         Args:
             action (`ndarray` with shape `(n_action,)): action provided by the agent to update the environment state.
-            observation (`ndarray` with shape `(n_observation,)): observation = C * state + D21 * disturbance 
+            observation (`ndarray` with shape `(n_observation,)): observation = C * state + D21 * disturbance
             (not used in the default reward function)
             disturbance (`ndarray` with shape `(n_disturbance,)): either stochastic or deterministic disturbance input.
             (not used in the default reward function)
@@ -307,16 +326,18 @@ class LinearControlEnv(gymnasium.Env):
         Example of constructing an environment with a custom reward function:
         ```
         def custom_get_reward(self, action, observation, disturbance, next_state):
-            return - np.linalg.norm(self.state)**2 - np.linalg.norm(action)**2 
-        
+            return - np.linalg.norm(self.state)**2 - np.linalg.norm(action)**2
+
         if __name__ == "__main__":
             env = gym.make('env_id', **kwargs)
             env.get_reward = custom_get_reward.__get__(env)
         ```
         """
-        reward = - float(self.state.T @ self.Q @ self.state 
-                         + action.T @ self.R @ action 
-                         + 2 * self.state.T @ self.S @ action)
+        reward = -float(
+            self.state.T @ self.Q @ self.state
+            + action.T @ self.R @ action
+            + 2 * self.state.T @ self.S @ action
+        )
         return reward
 
     def get_params_asdict(self):

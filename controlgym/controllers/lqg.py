@@ -3,8 +3,13 @@ import logging
 from scipy.linalg import solve_discrete_are, solve, inv, LinAlgError
 
 
-def _lqr_gain(A: np.ndarray[float], B: np.ndarray[float], Q: np.ndarray[float], 
-              R: np.ndarray[float], S: np.ndarray[float]):
+def _lqr_gain(
+    A: np.ndarray[float],
+    B: np.ndarray[float],
+    Q: np.ndarray[float],
+    R: np.ndarray[float],
+    S: np.ndarray[float],
+):
     """Private function to compute the gain matrices of the LQR controller
         using algebraic Riccati equation (ARE).
 
@@ -25,27 +30,36 @@ def _lqr_gain(A: np.ndarray[float], B: np.ndarray[float], Q: np.ndarray[float],
     else:
         gain_lqr = -solve(R + B.T @ P @ B, B.T @ P @ A + S.T)
         # compute the LQ tracking gain for PDE envs, where S = 0.
-        gain_lqt = inv(R + B.T @ P @ B) @ B.T @ inv(np.identity(A.shape[0]) - (A + B @ gain_lqr).T) @ Q
+        gain_lqt = (
+            inv(R + B.T @ P @ B)
+            @ B.T
+            @ inv(np.identity(A.shape[0]) - (A + B @ gain_lqr).T)
+            @ Q
+        )
     return gain_lqr, gain_lqt
 
-def _kf_gain(A: np.ndarray[float], C: np.ndarray[float], W: np.ndarray[float], V: np.ndarray[float]):
+
+def _kf_gain(
+    A: np.ndarray[float],
+    C: np.ndarray[float],
+    W: np.ndarray[float],
+    V: np.ndarray[float],
+):
     """Private function to compute the gain matrices of the Kalman filter
-            using algebraic Riccati equation (ARE).
+        using algebraic Riccati equation (ARE).
 
-        Args:
-            A, C, W, V: ndarray[float], system matrices and noise statistics.
+    Args:
+        A, C, W, V: ndarray[float], system matrices and noise statistics.
 
-        Returns:
-            gain: ndarray[float], filter gain matrix.
-            If the ARE fails to find a solution, gain is set to None.
-        """
+    Returns:
+        gain: ndarray[float], filter gain matrix.
+        If the ARE fails to find a solution, gain is set to None.
+    """
     try:
         Sigma = solve_discrete_are(A.T, C.T, W, V)
     except LinAlgError:
         # handle the exceptional case where solve_discrete_are fails
-        logging.warning(
-            "solve_discrete_are failed to find a finite solution for KF"
-        )
+        logging.warning("solve_discrete_are failed to find a finite solution for KF")
         gain = None
     else:
         gain = A @ Sigma @ C.T @ inv(C @ Sigma @ C.T + V)
@@ -67,7 +81,7 @@ class LQG:
             observation_t = C * state_t + sensor_noise_t
             process_noise_t = N(0, process_noise_cov * I)
             sensor_noise_t = N(0, sensor_noise_cov * I)
-        
+
     The LQG controller is computed as:
         action_t = gain_lqr * est_state_t + gain_lqt * target_state
         est_state_{t+1} = (A - gain_kf * C) * est_state_t + B2 * action_t
@@ -77,7 +91,7 @@ class LQG:
     ### Arguments
     For env_id in the following list:
     ["toy", "ac1", "ac2", "ac3", "ac4", "ac5", "ac6", "ac7", "ac8", "ac9", "ac10",
-    "bdt1", "bdt2", "cbm", "cdp", "cm1", "cm2", "cm3", "cm4", "cm5", 
+    "bdt1", "bdt2", "cbm", "cdp", "cm1", "cm2", "cm3", "cm4", "cm5",
     "dis1", "dis2", "dlr", "he1", "he2", "he3", "he4", "he5", "he6", "iss",
     "je1", "je2", "lah", "pas", "psm", "rea", "umv", "convection_diffusion_reaction",
     "wave", "schrodinger"]
@@ -90,12 +104,16 @@ class LQG:
     Argument:
         None.
     """
+
     def __init__(self, env):
         self.env = env
 
         # check whether the problem is linear
         is_linear = self.env.category == "linear" or self.env.id in [
-            "convection_diffusion_reaction", "wave", "schrodinger"]
+            "convection_diffusion_reaction",
+            "wave",
+            "schrodinger",
+        ]
         assert is_linear and all(
             hasattr(self.env, attr) for attr in ["A", "B2", "C"]
         ), "The environment is not linear or system matrices do not exist. LQG is not applicable"
@@ -154,7 +172,12 @@ class LQG:
         else:
             return self.gain_lqr @ est_state
 
-    def evolve_state_estimate(self, est_state: np.ndarray[float], action: np.ndarray[float], observation: np.ndarray[float]):
+    def evolve_state_estimate(
+        self,
+        est_state: np.ndarray[float],
+        action: np.ndarray[float],
+        observation: np.ndarray[float],
+    ):
         """Update the state estimate using the Kalman filter with new observation and control input.
 
         Args:
@@ -165,7 +188,11 @@ class LQG:
         Returns:
             est_state: ndarray[float], updated state estimate.
         """
-        return (self.env.A - self.gain_kf @ self.env.C) @ est_state + self.env.B2 @ action + self.gain_kf @ observation
+        return (
+            (self.env.A - self.gain_kf @ self.env.C) @ est_state
+            + self.env.B2 @ action
+            + self.gain_kf @ observation
+        )
 
     def run(self, state: np.ndarray[float] = None, seed: int = None):
         """Run a trajectory of the environment using the LQG controller,
@@ -177,7 +204,7 @@ class LQG:
             seed: (optional int), random seed for the environment.
 
         Returns:
-            total_reward: float, the accumulated reward of the trajectory, 
+            total_reward: float, the accumulated reward of the trajectory,
                 which is equal to the negative H2 cost.
         """
         # reset the environment

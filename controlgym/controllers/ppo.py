@@ -2,11 +2,19 @@ import numpy as np
 import os
 import torch
 from torch import nn
+from torch.utils.tensorboard import SummaryWriter
 
 
 class ActorNetwork(nn.Module):
-    """ Defines the actor network for the PPO controller. """
-    def __init__(self, input_size: int, hidden_size: int, output_size: int, device: torch.device = torch.device("cpu")):
+    """Defines the actor network for the PPO controller."""
+
+    def __init__(
+        self,
+        input_size: int,
+        hidden_size: int,
+        output_size: int,
+        device: torch.device = torch.device("cpu"),
+    ):
         super(ActorNetwork, self).__init__()
 
         self.device = device
@@ -25,8 +33,15 @@ class ActorNetwork(nn.Module):
 
 
 class CriticNetwork(nn.Module):
-    """ Defines the critic network for the PPO controller. """
-    def __init__(self, input_size: int, hidden_size: int, output_size: int, device: torch.device = torch.device("cpu")):
+    """Defines the critic network for the PPO controller."""
+
+    def __init__(
+        self,
+        input_size: int,
+        hidden_size: int,
+        output_size: int,
+        device: torch.device = torch.device("cpu"),
+    ):
         super(CriticNetwork, self).__init__()
 
         self.device = device
@@ -53,7 +68,7 @@ class PPO:
     ### Arguments
     For env_id in the following list:
     ["toy", "ac1", "ac2", "ac3", "ac4", "ac5", "ac6", "ac7", "ac8", "ac9", "ac10",
-    "bdt1", "bdt2", "cbm", "cdp", "cm1", "cm2", "cm3", "cm4", "cm5", 
+    "bdt1", "bdt2", "cbm", "cdp", "cm1", "cm2", "cm3", "cm4", "cm5",
     "dis1", "dis2", "dlr", "he1", "he2", "he3", "he4", "he5", "he6", "iss",
     "je1", "je2", "lah", "pas", "psm", "rea", "umv", "allen_cahn", "burgers",
     "cahn_hilliard", "convection_diffusion_reaction", "fisher", "ginzburg_landau",
@@ -71,16 +86,30 @@ class PPO:
         lr: float, learning rate.
         device: torch.device, device to run the controller.
     """
-    def __init__(self, env, actor_hidden_dim: int = 64, critic_hidden_dim: int = 64, 
-                 lr: int = 1e-4, discount_factor: float = 0.99, device: torch.device = torch.device("cpu")):
+
+    def __init__(
+        self,
+        env,
+        actor_hidden_dim: int = 64,
+        critic_hidden_dim: int = 64,
+        lr: int = 1e-4,
+        discount_factor: float = 0.99,
+        device: torch.device = torch.device("cpu"),
+        logger: SummaryWriter = None,
+    ):
         self.env = env
         self.actor_hidden_dim = actor_hidden_dim
         self.critic_hidden_dim = critic_hidden_dim
         self.device = device
         self.discount_factor = discount_factor
 
+        self.logger = logger
+
         self.actor = ActorNetwork(
-            self.env.n_observation, self.actor_hidden_dim, self.env.n_action, device=device
+            self.env.n_observation,
+            self.actor_hidden_dim,
+            self.env.n_action,
+            device=device,
         ).to(device)
         self.critic = CriticNetwork(
             self.env.n_observation, self.critic_hidden_dim, 1, device=device
@@ -108,10 +137,21 @@ class PPO:
             dist = torch.distributions.MultivariateNormal(mean, cov)
             action = dist.sample()
             log_prob = dist.log_prob(action)
-            return torch.Tensor.cpu(action).detach().numpy(), torch.Tensor.cpu(log_prob).detach()
+            return (
+                torch.Tensor.cpu(action).detach().numpy(),
+                torch.Tensor.cpu(log_prob).detach(),
+            )
 
-    def train(self, num_train_iter: int = 50, num_episodes_per_iter: int = 20, episode_length: int = 20, 
-              sgd_epoch_num: int = 4, mini_batch_size: int = 5, clip: float = 0.2, cov_param: float = 0.05):
+    def train(
+        self,
+        num_train_iter: int = 50,
+        num_episodes_per_iter: int = 20,
+        episode_length: int = 20,
+        sgd_epoch_num: int = 4,
+        mini_batch_size: int = 5,
+        clip: float = 0.2,
+        cov_param: float = 0.05,
+    ):
         """Training loop for the PPO controller.
         Args:
             num_train_iter: int, number of training iterations.
@@ -136,8 +176,12 @@ class PPO:
                 episode_rewards = []
 
                 for step in range(episode_length):
-                    action, log_prob = self.select_action(observation, cov_param=cov_param)
-                    next_obs, reward, terminated, truncated, info = self.env.step(action)
+                    action, log_prob = self.select_action(
+                        observation, cov_param=cov_param
+                    )
+                    next_obs, reward, terminated, truncated, info = self.env.step(
+                        action
+                    )
                     if terminated or truncated:
                         break
 
@@ -153,8 +197,13 @@ class PPO:
             actions = torch.FloatTensor(np.array(actions)).to(self.device)
             log_probs = torch.FloatTensor(np.array(log_probs)).to(self.device)
 
-            average_rewards = np.mean([np.sum(episode_rewards) for episode_rewards in rewards])
-            print("Iteration: ", iteration, ", Average Rewards: ", average_rewards)
+            average_rewards = np.mean(
+                [np.sum(episode_rewards) for episode_rewards in rewards]
+            )
+            if self.logger:
+                self.logger.log_episode({"iter": iteration, "avg_rew": average_rewards})
+            else:
+                print("Iteration: ", iteration, ", Average Rewards: ", average_rewards)
             returns = self._calc_GAE(rewards)
 
             values = self.critic(observations).squeeze()
@@ -169,7 +218,9 @@ class PPO:
 
                     values = self.critic(observations[ids]).squeeze()
                     mean = self.actor(observations[ids])
-                    cov = torch.diag(torch.ones(self.env.n_action) * cov_param).to(self.device)
+                    cov = torch.diag(torch.ones(self.env.n_action) * cov_param).to(
+                        self.device
+                    )
                     dist = torch.distributions.MultivariateNormal(mean, cov)
 
                     log_probs_new = dist.log_prob(actions[ids])
@@ -234,7 +285,7 @@ class PPO:
         self.env.state_traj = state_traj
         return total_reward
 
-    def save(self, test_dir: str = None):
+    def save(self, test_dir: str = None, model_name: str = "ppo_params.pt"):
         """Save the PPO parameters to the test directory.
         Args:
             test_dir: str, directory to save the trained parameters.
@@ -250,9 +301,9 @@ class PPO:
             "critic": self.critic.state_dict(),
             "optimizer": self.optimizer.state_dict(),
         }
-        torch.save(ppo_params, os.path.join(test_dir, "ppo_params.pt"))
+        torch.save(ppo_params, os.path.join(test_dir, model_name))
 
-    def load(self, test_dir: str = None):
+    def load(self, test_dir: str = None, model_name: str = "ppo_params.pt"):
         """Load the PPO parameters from the test directory.
         Args:
             test_dir: str, directory to load the trained parameters.
@@ -263,7 +314,7 @@ class PPO:
         if not os.path.exists(test_dir):
             raise FileNotFoundError(f"{test_dir} does not exist")
 
-        ppo_params = torch.load(os.path.join(test_dir, "ppo_params.pt"))
+        ppo_params = torch.load(os.path.join(test_dir, model_name))
         self.actor.load_state_dict(ppo_params["actor"])
         self.critic.load_state_dict(ppo_params["critic"])
         self.optimizer.load_state_dict(ppo_params["optimizer"])
