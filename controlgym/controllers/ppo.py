@@ -200,11 +200,14 @@ class PPO:
             average_rewards = np.mean(
                 [np.sum(episode_rewards) for episode_rewards in rewards]
             )
+            # print("Episode reward: {}".format(episode_rewards))
             if self.logger:
                 self.logger.log_episode({"iter": iteration, "avg_rew": average_rewards})
             else:
                 print("Iteration: ", iteration, ", Average Rewards: ", average_rewards)
             returns = self._calc_GAE(rewards)
+            # print("Cal GAE rewards: {}".format(returns))
+            # print("Cal GAE shape: {}".format(returns.shape))
 
             values = self.critic(observations).squeeze()
             advantage = returns - values.detach()
