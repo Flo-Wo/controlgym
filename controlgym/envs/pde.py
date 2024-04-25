@@ -249,7 +249,12 @@ class PDE(gymnasium.Env):
         truncated = (
             False if self.reward_range[0] <= reward <= self.reward_range[1] else True
         )
-        info = {"state": self.state}
+        info = {
+            "state": self.state,
+            "proj_real_rew": self.projected_reward(
+                self.C @ self.state, action=action
+            ),  # self.projected_reward(self.state, action),
+        }
 
         # return the observation and stage cost
         return observation, reward, terminated, truncated, info
@@ -361,6 +366,15 @@ class PDE(gymnasium.Env):
             + action.T @ self.R @ action
         )
         return reward
+
+    def projected_reward(self, state: np.ndarray[float], action: np.ndarray[float]):
+        # same as the get_reward, but not using the internal state and working with the
+        # reward only in the observable space, i.e. multiply with the projected reward
+        # matrices
+        return -float(
+            (state - self.C_target_state).T @ self.C_Q @ (state - self.C_target_state)
+            + action.T @ self.R @ action
+        )
 
     def _compute_fourier_linear_op(self):
         """

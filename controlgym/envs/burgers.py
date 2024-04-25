@@ -101,6 +101,11 @@ class BurgersEnv(PDE):
         self.control_sup = self._compute_control_sup()
         self.C = self._compute_C()
 
+        # TODO(my addition): project the reward matrix and the target state in the lower
+        # dimensional observable space
+        self.C_Q = self.C @ self.Q @ self.C.T
+        self.C_target_state = self.C @ self.target_state
+
     def _compute_fourier_linear_op(self):
         """Private function to compute the linear operator of the PDE in Fourier space.
 
