@@ -306,7 +306,6 @@ class PDE(gymnasium.Env):
         observation = self._get_obs()
         info = {"state": self.state}
         self.step_count = 0
-
         # return the state resetting to and the observation
         return observation, info
 
