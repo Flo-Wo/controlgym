@@ -104,7 +104,6 @@ class BurgersEnv(PDE):
 
         # TODO(my addition): project the reward matrix and the target state in the lower
         # dimensional observable space
-        self.C_Q = self.C @ self.Q @ self.C.T
         self.C_target_state = self.C @ self.target_state
 
     def _compute_fourier_linear_op(self):

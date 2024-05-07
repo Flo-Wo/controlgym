@@ -112,6 +112,7 @@ class PDE(gymnasium.Env):
 
         # set up the weighting matrices
         self.Q = Q_weight * np.identity(self.n_state)
+        self.C_Q = Q_weight * np.identity(self.n_observation)
         self.R = R_weight * np.identity(self.n_action)
 
         # set up the gym.Env attributes
