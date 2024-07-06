@@ -94,6 +94,7 @@ class BurgersEnv(PDE):
             self.init_state = np.cosh(
                 10 * (self.domain_coordinates - 1 * self.domain_length / 2)
             ) ** (-1)
+            # NOTE(random reset)
             self.init_state = 2 * np.random.rand(n_state) - 1
         self.state = self.init_state
         self.diffusivity_constant = diffusivity_constant
